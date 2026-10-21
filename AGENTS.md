@@ -90,15 +90,14 @@ Before selecting verification checks, read the [verification guidance](.agents/v
 
 ### Faster coverage-profile harness iteration
 
-`cargo minsize`, `cargo allocs`, `cargo coverage` and `cargo lint-timings` (and the `just` recipes that call them) build with `--profile coverage`, whose cross-crate thin LTO re-runs over the whole binary after every edit. For local edit-and-rerun loops, override the profile from the environment; CI keeps the unmodified profile:
+`cargo minsize`, `cargo allocs`, `cargo coverage` and `cargo lint-timings` build with `--profile coverage`. For tighter local edit-and-rerun loops, you can also enable incremental compilation for that profile (CI does not):
 
 ```bash
-export CARGO_PROFILE_COVERAGE_LTO=false CARGO_PROFILE_COVERAGE_INCREMENTAL=true
+export CARGO_PROFILE_COVERAGE_INCREMENTAL=true
 ```
 
-- On a 4-core Linux machine, after a one-line edit in `oxc_minifier`, edit-to-result dropped from 27.7s to 7.3s for `cargo minsize` and from 31.9s to 7.7s for `cargo allocs`, with byte-identical `minsize.snap`, `allocs_*.yaml` and coverage snapshots.
-- Harness runtime rises by up to ~8% (mostly from incremental), and the incremental cache grows the target directory 2-3x. `CARGO_PROFILE_COVERAGE_LTO=false` alone is ~2.6x faster with at most ~2% runtime cost and no extra disk.
-- Artifacts for both settings coexist in one target directory: the first build with the overrides compiles everything once, and switching back and forth afterwards is free.
+- Replaying 11 recent `main` commits through `cargo minsize`, `cargo allocs` and `cargo coverage`, this roughly halved edit-to-result time (923s to 463s in total) with byte-identical outputs.
+- Costs: harness runs are ~6% slower, and the incremental cache in `target/coverage/incremental` grew to ~10 GB over those commits. Delete that directory to reclaim the space.
 
 ## Manual Testing & Examples
 
