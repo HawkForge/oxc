@@ -88,6 +88,18 @@ Before selecting verification checks, read the [verification guidance](.agents/v
 - Reuse passing results while tested inputs remain unchanged. Reserve `just ready` for stable integration checkpoints when broad validation is needed.
 - Preserve required subsystem checks and per-PR CI; a passing stack tip does not establish that intermediate PRs pass.
 
+### Faster coverage-profile harness iteration
+
+`cargo minsize`, `cargo allocs`, `cargo coverage` and `cargo lint-timings` (and the `just` recipes that call them) build with `--profile coverage`, whose cross-crate thin LTO re-runs over the whole binary after every edit. For local edit-and-rerun loops, override the profile from the environment; CI keeps the unmodified profile:
+
+```bash
+export CARGO_PROFILE_COVERAGE_LTO=false CARGO_PROFILE_COVERAGE_INCREMENTAL=true
+```
+
+- On a 4-core Linux machine, after a one-line edit in `oxc_minifier`, edit-to-result dropped from 27.7s to 7.3s for `cargo minsize` and from 31.9s to 7.7s for `cargo allocs`, with byte-identical `minsize.snap`, `allocs_*.yaml` and coverage snapshots.
+- Harness runtime rises by up to ~8% (mostly from incremental), and the incremental cache grows the target directory 2-3x. `CARGO_PROFILE_COVERAGE_LTO=false` alone is ~2.6x faster with at most ~2% runtime cost and no extra disk.
+- Artifacts for both settings coexist in one target directory: the first build with the overrides compiles everything once, and switching back and forth afterwards is free.
+
 ## Manual Testing & Examples
 
 Run crate examples for quick testing and debugging:
@@ -160,8 +172,8 @@ just conformance                       # Run all conformance tests (alias: cargo
 cargo test -p <crate_name>             # Test specific crate
 
 # Conformance for specific tools
-cargo coverage -- parser               # Parser conformance
-cargo coverage -- transformer          # Transformer conformance
+cargo coverage parser                  # Parser conformance
+cargo coverage transformer             # Transformer conformance
 cargo run -p oxc_transform_conformance # Transformer Babel tests
 
 # NAPI packages
@@ -175,7 +187,7 @@ Each crate follows distinct testing patterns:
 #### oxc_parser
 
 - **Conformance only** via `tasks/coverage`
-- **Command**: `cargo coverage -- parser`
+- **Command**: `cargo coverage parser`
 - **Suites**: Test262, Babel, TypeScript
 - **Special**: `just allocs` for allocation tracking
 
